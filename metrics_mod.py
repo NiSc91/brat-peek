@@ -11,7 +11,7 @@ import os
 import pandas as pd
 import numpy as np
 import warnings
-
+from statsmodels.stats.inter_rater import cohens_kappa
 
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
     return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
@@ -21,7 +21,7 @@ warnings.formatwarning = warning_on_one_line
 
 
 # Show metrics
-def show_iaa(corpus_list, rel_variables, rel_labels, tsv=False):
+def show_iaa(corpus_list, rel_variables, rel_labels, agr_type=['percentage', 'kappa'], tsv=False):
     """
     Compute IAA from several annotators (all vs all and detailed) and for different labels (all together and per label).
     :param corpus_list: list of AnnCorpus.
@@ -69,6 +69,14 @@ def show_iaa(corpus_list, rel_variables, rel_labels, tsv=False):
     (iaa_all_vs_all, iaa_pairwise,
      iaa_by_label, count_labels) = computations(list_df, rel_variables,
                                                 annotator_names, by_label=True)
+     
+    ##### Compute Cohen's kappa #####
+    pdb.set_trace()
+    merged_df = pd.merge(list_df[0], list_df[1], on=['filename', 'offset'], suffixes=['_ann1', '_ann2'])    
+    contingency_table = pd.crosstab(merged_df['label_ann1'], merged_df['label_ann2'])
+
+    kappa_result = cohens_kappa(contingency_table, weights=[0.5, 0.5, 0])
+    
     ###### PRINT ######
     print('_________________________________________________________________')
     print('\nIAA taking into account {}'.format(rel_variables))
@@ -90,6 +98,10 @@ def show_iaa(corpus_list, rel_variables, rel_labels, tsv=False):
     for k, v in sorted(iaa_by_label.items()):
         print(k + ': ' + str(round(v[0], 3)) + '\t(' + str(count_labels[k]) + ')')
     print('\n')
+    print('-----------------------------------------------------------------')
+    print('Cohen\'s kappa:')
+    print('-----------------------------------------------------------------')
+    print(round(kappa_result.kappa, 3))
 
 
 def show_fscore(gs, pred, rel_labels, verbose=False):
@@ -299,7 +311,7 @@ def computations(list_df, relevant_colnames, annotator_names, by_label=False):
 
     # Compute IAA
     iaa_all_vs_all, iaa_pairwise = compute_iaa(codes, annotator_names)
-
+       
     if by_label == False:
         return iaa_all_vs_all, iaa_pairwise
 
@@ -336,7 +348,6 @@ def get_codes(list_df, relevant_colnames, rel_labels):
         Contains names of annotators.
 
     '''
-    pdb.set_trace()
     codes = []
     annotator_names = []
     for df in list_df:

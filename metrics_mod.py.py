@@ -11,6 +11,8 @@ import os
 import pandas as pd
 import numpy as np
 import warnings
+from sklearn.metrics import cohen_kappa_score
+
 
 
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
