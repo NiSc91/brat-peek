@@ -405,7 +405,7 @@ def compute_kappa(list_df, relevant_colnames, weights=None,):
     """ Compute Cohen's kappa.
 
     Parameters:
-    - list_df (list of DataFrame): A list containing two DataFrames that will be merged.
+    - list_df (list of DataFrame): A list containing two DataFrames that will be merged, one per annotator.
     - relevant_colnames (optional, default=None): A list of column names to consider for computing kappa.
         If None, all columns will be considered.
     - weights (optional, default=None): A 1D array-like object specifying the weights to be used.
@@ -414,7 +414,11 @@ def compute_kappa(list_df, relevant_colnames, weights=None,):
     - kappa_result: The computed Cohen's kappa value.
     """
 
-    merged_df = pd.merge(list_df[0], list_df[1], on=relevant_colnames, suffixes=['_ann1', '_ann2'])    
+    #merged_df = pd.merge(list_df[0], list_df[1], on=relevant_colnames, suffixes=['_ann1', '_ann2'])    
+    merged_df = pd.merge(list_df[0], list_df[1], on=relevant_colnames, how='outer', suffixes=['_ann1', '_ann2'])
+    merged_df[['label_ann1', 'label_ann2']] = merged_df[['label_ann1', 'label_ann2']].fillna('unlabelled')  # Fill NaN values with unlabeled
+
+    merged_df.to_csv("temp/agreement_df.csv", encoding="utf-8")
     contingency_table = pd.crosstab(merged_df['label_ann1'], merged_df['label_ann2'])
     
     kappa_result = cohens_kappa(contingency_table, weights=weights)
