@@ -1,3 +1,4 @@
+import pdb
 """
 Calculate different metrics by comparing two or more corpora.
 
@@ -10,7 +11,9 @@ import os
 import pandas as pd
 import numpy as np
 import warnings
-
+from statsmodels.stats.inter_rater import cohens_kappa
+from pygamma_agreement import Continuum, CombinedCategoricalDissimilarity
+from pyannote.core import Segment
 
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
     return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
@@ -68,6 +71,15 @@ def show_iaa(corpus_list, rel_variables, rel_labels, tsv=False):
     (iaa_all_vs_all, iaa_pairwise,
      iaa_by_label, count_labels) = computations(list_df, rel_variables,
                                                 annotator_names, by_label=True)
+     
+    ##### Compute Cohen's kappa #####
+    #pdb.set_trace()
+    kappa_result = compute_kappa(list_df, ['filename', 'offset', 'span'], weights=None)
+    
+    ##### Compute gamma agreement #####
+    pdb.set_trace()
+    gamma_results = compute_gamma(list_df)
+
     ###### PRINT ######
     print('_________________________________________________________________')
     print('\nIAA taking into account {}'.format(rel_variables))
@@ -89,6 +101,13 @@ def show_iaa(corpus_list, rel_variables, rel_labels, tsv=False):
     for k, v in sorted(iaa_by_label.items()):
         print(k + ': ' + str(round(v[0], 3)) + '\t(' + str(count_labels[k]) + ')')
     print('\n')
+    print('-----------------------------------------------------------------')
+    print('Cohen\'s kappa:')
+    print('-----------------------------------------------------------------')
+    print(round(kappa_result.kappa, 3))
+    print()
+    print(f"Gamma agreement: {gamma_results.gamma}")
+
 
 
 def show_fscore(gs, pred, rel_labels, verbose=False):
@@ -298,7 +317,7 @@ def computations(list_df, relevant_colnames, annotator_names, by_label=False):
 
     # Compute IAA
     iaa_all_vs_all, iaa_pairwise = compute_iaa(codes, annotator_names)
-
+       
     if by_label == False:
         return iaa_all_vs_all, iaa_pairwise
 
@@ -390,7 +409,6 @@ def compute_iaa(codes, annotator_names):
 
     return all_vs_all, pairwise
 
-
 def print_iaa_annotators(annotator_names, iaa_pairwise):
     '''
     Print IAA pairwise in a pretty way
@@ -416,3 +434,50 @@ def print_iaa_annotators(annotator_names, iaa_pairwise):
         c = c + 1
         print('\t', end='')
         print(str(round(v, 3)), end='')
+
+## Functions to compute Cohen's kappa agreement
+def compute_kappa(list_df, relevant_colnames, weights=None,):
+    """ Compute Cohen's kappa.
+
+    Parameters:
+    - list_df (list of DataFrame): A list containing two DataFrames that will be merged, one per annotator.
+    - relevant_colnames (optional, default=None): A list of column names to consider for computing kappa.
+        If None, all columns will be considered.
+    - weights (optional, default=None): A 1D array-like object specifying the weights to be used.
+
+    Returns:
+    - kappa_result: The computed Cohen's kappa value.
+    """
+
+    #merged_df = pd.merge(list_df[0], list_df[1], on=relevant_colnames, suffixes=['_ann1', '_ann2'])    
+    merged_df = pd.merge(list_df[0], list_df[1], on=relevant_colnames, how='outer', suffixes=['_ann1', '_ann2'])
+    #merged_df[['label_ann1', 'label_ann2']] = merged_df[['label_ann1', 'label_ann2']].fillna('unlabelled')  # Fill NaN values with unlabeled
+
+    merged_df.to_csv("temp/agreement_df.csv", encoding="utf-8")
+    contingency_table = pd.crosstab(merged_df['label_ann1'], merged_df['label_ann2'])
+    
+    kappa_result = cohens_kappa(contingency_table, weights=weights)
+    return kappa_result
+
+## Functions to compute gamma agreement
+def df_to_continuum(list_df, annotator_names):
+    continuum = Continuum()
+    for df, annotator_name in zip(list_df, annotator_names):
+        for _, row in df.iterrows():
+            start, end = map(int, row['span'].split())
+            segment = Segment(start, end)
+            label = row['label']
+            continuum.add(annotator_name, segment, label)
+    return continuum
+
+def compute_gamma(list_df, alpha=1, beta=2):
+    # Create a Continuum object from all DataFrames
+    continuum = df_to_continuum(list_df, annotator_names=['Annotator_1', 'Annotator_2'])
+    
+    # Create the dissimilarity measure
+    dissim = CombinedCategoricalDissimilarity(alpha=alpha, beta=beta)
+    
+    # Compute Gamma agreement
+    gamma_results = continuum.compute_gamma(dissim)
+    
+    return gamma_results
