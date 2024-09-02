@@ -53,6 +53,10 @@ def show_iaa(corpus_list, rel_variables, rel_labels, tsv=False):
         list_df.append(df)
 
     if tsv:
+        # Create a 'temp' directory if it doesn't exist
+        if not os.path.exists('temp'):
+            os.makedirs('temp')
+        
         paths = list(map(lambda x: os.path.join('temp', x + '.tsv'), annotator_names))
         output_annotation_tables(list_df, paths)
 
